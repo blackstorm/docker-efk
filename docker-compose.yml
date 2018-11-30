@@ -1,0 +1,58 @@
+version: '2'
+services:
+
+  fluentd:
+    build: ./fluentd
+    restart: always
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    logging:
+        driver: "json-file"
+        options:
+            max-size: 100m
+            max-file: "5"
+
+  elasticsearch:
+    image: elasticsearch:6.5.1
+    restart: always
+
+  kibana:
+    image: kibana:6.5.1
+    restart: always
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+
+  grafana:
+    image: grafana/grafana
+    restart: always
+    links:
+      - elasticsearch
+    # http://docs.grafana.org/installation/docker/
+    # https://serverfault.com/questions/684709/how-to-proxy-grafana-with-nginx
+    environment:
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  nginx:
+    image: nginx
+    restart: always
+    volumes:
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - kibana
+      - grafana
+    links:
+      - kibana
+      - grafana
+    ports:
+      - 80:80
+      - 443:443
